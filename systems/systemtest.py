@@ -50,14 +50,14 @@ def calculate_carry_forecast(raw_carry):
         print(f"Error calculating carry forecast: {str(e)}")
         return pd.Series(0, index=raw_carry.index)
 
-def systemtest(data=None, config=None, instrument="SOFR"):
+def systemtest(data=None, config=None, instruments=["SOFR"]):
     """
     Example test system using only carry strategy
     
     Args:
         data: Optional data source, defaults to csvFuturesSimData
         config: Optional system configuration
-        instrument: Instrument code to trade (default: "SOFR")
+        instruments: List of instrument codes to trade (default: ["SOFR"])
     """
     if data is None:
         data = csvFuturesSimData()
@@ -66,15 +66,18 @@ def systemtest(data=None, config=None, instrument="SOFR"):
         # Create trading rule
         carry_rule = TradingRule(calculate_carry_forecast)
         
-        # Define config with dynamic instrument
+        # Create instrument weights dictionary dynamically
+        instrument_weights = {instrument: 1.0/len(instruments) for instrument in instruments}
+        
+        # Define config with dynamic instruments
         config = Config(
             dict(
                 trading_rules=dict(carry=carry_rule),
-                instruments=[instrument],
+                instruments=instruments,
                 forecast_scalars=dict(carry=1.0),
                 forecast_weights=dict(carry=1.0),
                 forecast_div_multiplier=1.1,
-                instrument_weights={instrument: 1.0},
+                instrument_weights=instrument_weights,
                 instrument_div_multiplier=1.0,
                 percentage_vol_target=20.0,
                 notional_trading_capital=100000,
@@ -99,37 +102,41 @@ def systemtest(data=None, config=None, instrument="SOFR"):
 
     return my_system
 
-def analyze_strategies(data=None, instrument="SOFR"):
+def analyze_strategies(data=None, instruments=["SOFR"]):
     """
-    Analyze carry strategy for a given instrument
+    Analyze carry strategy for given instruments
     
     Args:
         data: Optional data source, defaults to csvFuturesSimData
-        instrument: Instrument code to analyze (default: "SOFR")
+        instruments: List of instrument codes to analyze (default: ["SOFR"])
     """
     if data is None:
         data = csvFuturesSimData()
 
-    price = data.daily_prices(instrument)
-    
-    # Calculate Carry forecast
-    raw_carry = data.get_instrument_raw_carry_data(instrument)
-    carry_forecast = calculate_carry_forecast(raw_carry)
-    
-    # Align carry forecast with price data
-    carry_forecast = carry_forecast.reindex(price.index, method='ffill')
-    carry_forecast = carry_forecast.fillna(0)
-    
-    # Calculate Carry P&L
-    account = Account()
-    carry_account = account.pandl_for_instrument_forecast(
-        instrument,
-        "carry",
-        carry_forecast,
-        price
-    )
-    
-    print("\nCarry Strategy Stats:")
-    print(carry_account.percent.stats())
+    results = {}
+    for instrument in instruments:
+        print(f"\nAnalyzing {instrument}:")
+        price = data.daily_prices(instrument)
+        
+        # Calculate Carry forecast
+        raw_carry = data.get_instrument_raw_carry_data(instrument)
+        carry_forecast = calculate_carry_forecast(raw_carry)
+        
+        # Align carry forecast with price data
+        carry_forecast = carry_forecast.reindex(price.index, method='ffill')
+        carry_forecast = carry_forecast.fillna(0)
+        
+        # Calculate Carry P&L
+        account = Account()
+        carry_account = account.pandl_for_instrument_forecast(
+            instrument,
+            "carry",
+            carry_forecast,
+            price
+        )
+        
+        print(f"\n{instrument} Carry Strategy Stats:")
+        print(carry_account.percent.stats())
+        results[instrument] = carry_account
 
-    return data
+    return results
