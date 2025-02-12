@@ -14,50 +14,6 @@ from systems.provided.rules.ewmac import robust_vol_calc
 import pandas as pd
 import numpy as np
 
-def calc_ewmac_forecast(price, Lfast, Lslow=None):
-    """
-    Calculate the ewmac trading rule forecast, given a price and EWMA speeds
-    Lfast, Lslow and vol_lookback
-
-    Args:
-        price (pd.Series): Price series
-        Lfast (int): Fast ewma window
-        Lslow (int, optional): Slow ewma window. If None, will be 4 * Lfast
-
-    Returns:
-        pd.Series: EWMAC forecast
-    """
-    # Convert price to Series if it's not already
-    if isinstance(price, pd.DataFrame):
-        price = price.iloc[:, 0]
-    elif not isinstance(price, pd.Series):
-        if hasattr(price, 'flatten'):
-            price = pd.Series(price.flatten())
-        else:
-            price = pd.Series(price)
-
-    # Resample to business days
-    price = price.resample("1B").last()
-
-    # Default Lslow
-    if Lslow is None:
-        Lslow = 4 * Lfast
-
-    # Calculate EWMA
-    fast_ewma = price.ewm(span=Lfast).mean()
-    slow_ewma = price.ewm(span=Lslow).mean()
-    raw_ewmac = fast_ewma - slow_ewma
-
-    # Volatility adjustment
-    vol = robust_vol_calc(price.diff())
-    
-    # Avoid division by zero
-    vol = vol.replace(0, np.nan)
-    forecast = raw_ewmac / vol
-    
-    # Return as Series, not DataFrame
-    return pd.Series(forecast.fillna(0))
-
 def calculate_carry_forecast(raw_carry):
     """
     Calculate the carry forecast using both standard and relative carry
@@ -94,10 +50,9 @@ def calculate_carry_forecast(raw_carry):
         print(f"Error calculating carry forecast: {str(e)}")
         return pd.Series(0, index=raw_carry.index)
 
-
 def systemtest(data=None, config=None, instrument="SOFR"):
     """
-    Example test system combining EWMAC and carry strategies
+    Example test system using only carry strategy
     
     Args:
         data: Optional data source, defaults to csvFuturesSimData
@@ -108,22 +63,16 @@ def systemtest(data=None, config=None, instrument="SOFR"):
         data = csvFuturesSimData()
         
     if config is None:
-        # Create trading rules
-        ewmac_rule = TradingRule(
-            dict(
-                function=calc_ewmac_forecast,
-                other_args=dict(Lfast=32, Lslow=128)
-            )
-        )
+        # Create trading rule
         carry_rule = TradingRule(calculate_carry_forecast)
         
         # Define config with dynamic instrument
         config = Config(
             dict(
-                trading_rules=dict(ewmac=ewmac_rule, carry=carry_rule),
+                trading_rules=dict(carry=carry_rule),
                 instruments=[instrument],
-                forecast_scalars=dict(ewmac=1.0, carry=1.0),
-                forecast_weights=dict(ewmac=0.5, carry=0.5),
+                forecast_scalars=dict(carry=1.0),
+                forecast_weights=dict(carry=1.0),
                 forecast_div_multiplier=1.1,
                 instrument_weights={instrument: 1.0},
                 instrument_div_multiplier=1.0,
@@ -152,7 +101,7 @@ def systemtest(data=None, config=None, instrument="SOFR"):
 
 def analyze_strategies(data=None, instrument="SOFR"):
     """
-    Analyze EWMAC and carry strategies for a given instrument
+    Analyze carry strategy for a given instrument
     
     Args:
         data: Optional data source, defaults to csvFuturesSimData
@@ -163,25 +112,6 @@ def analyze_strategies(data=None, instrument="SOFR"):
 
     price = data.daily_prices(instrument)
     
-    # Calculate EWMAC forecast
-    ewmac = calc_ewmac_forecast(price, 32, 128)
-    ewmac = pd.DataFrame(ewmac, columns=["forecast"])
-    
-    print("\nEWMAC Forecast:")
-    print(ewmac.tail(5))
-    
-    # Calculate EWMAC P&L
-    account = Account()
-    ewmac_account = account.pandl_for_instrument_forecast(
-        instrument,
-        "ewmac",
-        ewmac,
-        price
-    )
-    
-    print("\nEWMAC Strategy Stats:")
-    print(ewmac_account.percent.stats())
-    
     # Calculate Carry forecast
     raw_carry = data.get_instrument_raw_carry_data(instrument)
     carry_forecast = calculate_carry_forecast(raw_carry)
@@ -191,6 +121,7 @@ def analyze_strategies(data=None, instrument="SOFR"):
     carry_forecast = carry_forecast.fillna(0)
     
     # Calculate Carry P&L
+    account = Account()
     carry_account = account.pandl_for_instrument_forecast(
         instrument,
         "carry",
