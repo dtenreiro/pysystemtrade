@@ -50,18 +50,19 @@ def calculate_carry_forecast(raw_carry):
         print(f"Error calculating carry forecast: {str(e)}")
         return pd.Series(0, index=raw_carry.index)
 
-def systemtest(data=None, config=None, instruments=["SOFR"]):
+def systemtest(data=None, config=None, instruments=["SOFR"], start_date=None, end_date=None):
     """
     Example test system using only carry strategy
-    
-    Args:
-        data: Optional data source, defaults to csvFuturesSimData
-        config: Optional system configuration
-        instruments: List of instrument codes to trade (default: ["SOFR"])
     """
     if data is None:
         data = csvFuturesSimData()
         
+    # Convert dates to pandas datetime if provided
+    if start_date is not None:
+        start_date = pd.to_datetime(start_date)
+    if end_date is not None:
+        end_date = pd.to_datetime(end_date)
+    
     if config is None:
         # Create trading rule
         carry_rule = TradingRule(calculate_carry_forecast)
@@ -69,7 +70,7 @@ def systemtest(data=None, config=None, instruments=["SOFR"]):
         # Create instrument weights dictionary dynamically
         instrument_weights = {instrument: 1.0/len(instruments) for instrument in instruments}
         
-        # Define config with dynamic instruments
+        # Define config with dynamic instruments and date range
         config = Config(
             dict(
                 trading_rules=dict(carry=carry_rule),
@@ -81,9 +82,12 @@ def systemtest(data=None, config=None, instruments=["SOFR"]):
                 instrument_div_multiplier=1.0,
                 percentage_vol_target=20.0,
                 notional_trading_capital=100000,
-                base_currency="USD"
+                base_currency="USD",
+                start_date=start_date,
+                end_date=end_date
             )
         )
+
 
     # Create and wire up system
     my_system = System(
@@ -102,27 +106,41 @@ def systemtest(data=None, config=None, instruments=["SOFR"]):
 
     return my_system
 
-def analyze_strategies(data=None, instruments=["SOFR"]):
+def analyze_strategies(data=None, instruments=["SOFR"], start_date=None, end_date=None):
     """
     Analyze carry strategy for given instruments
     
     Args:
         data: Optional data source, defaults to csvFuturesSimData
         instruments: List of instrument codes to analyze (default: ["SOFR"])
+        start_date: Optional start date for analysis (str or datetime)
+        end_date: Optional end date for analysis (str or datetime)
     """
     if data is None:
         data = csvFuturesSimData()
+
+    # Convert dates to pandas datetime if provided
+    if start_date is not None:
+        start_date = pd.to_datetime(start_date)
+    if end_date is not None:
+        end_date = pd.to_datetime(end_date)
 
     results = {}
     for instrument in instruments:
         print(f"\nAnalyzing {instrument}:")
         price = data.daily_prices(instrument)
         
+        # Filter price data based on date range if provided
+        if start_date is not None:
+            price = price[price.index >= start_date]
+        if end_date is not None:
+            price = price[price.index <= end_date]
+        
         # Calculate Carry forecast
         raw_carry = data.get_instrument_raw_carry_data(instrument)
         carry_forecast = calculate_carry_forecast(raw_carry)
         
-        # Align carry forecast with price data
+        # Filter and align carry forecast with price data
         carry_forecast = carry_forecast.reindex(price.index, method='ffill')
         carry_forecast = carry_forecast.fillna(0)
         
