@@ -27,9 +27,15 @@ def calc_ewmac_forecast(price, Lfast, Lslow=None):
     Returns:
         pd.Series: EWMAC forecast
     """
-    if not isinstance(price, pd.Series):
-        price = pd.Series(price)
-        
+    # Convert price to Series if it's not already
+    if isinstance(price, pd.DataFrame):
+        price = price.iloc[:, 0]
+    elif not isinstance(price, pd.Series):
+        if hasattr(price, 'flatten'):
+            price = pd.Series(price.flatten())
+        else:
+            price = pd.Series(price)
+
     # Resample to business days
     price = price.resample("1B").last()
 
@@ -49,7 +55,8 @@ def calc_ewmac_forecast(price, Lfast, Lslow=None):
     vol = vol.replace(0, np.nan)
     forecast = raw_ewmac / vol
     
-    return forecast.fillna(0)
+    # Return as Series, not DataFrame
+    return pd.Series(forecast.fillna(0))
 
 def calculate_carry_forecast(raw_carry):
     """
@@ -59,10 +66,16 @@ def calculate_carry_forecast(raw_carry):
         raw_carry (pd.Series): Raw carry data
 
     Returns:
-        pd.DataFrame: Carry forecast with 'forecast' column
+        pd.Series: Carry forecast
     """
-    if not isinstance(raw_carry, pd.Series):
-        raw_carry = pd.Series(raw_carry)
+    # Convert raw_carry to Series if it's not already
+    if isinstance(raw_carry, pd.DataFrame):
+        raw_carry = raw_carry.iloc[:, 0]
+    elif not isinstance(raw_carry, pd.Series):
+        if hasattr(raw_carry, 'flatten'):
+            raw_carry = pd.Series(raw_carry.flatten())
+        else:
+            raw_carry = pd.Series(raw_carry)
     
     try:
         # Calculate basic smoothed carry
@@ -74,16 +87,22 @@ def calculate_carry_forecast(raw_carry):
         # Calculate relative carry
         carry_forecast = relative_carry(smoothed_carry, zero_benchmark)
         
-        # Format output
-        return pd.DataFrame(carry_forecast, columns=["forecast"])
+        # Return as Series, not DataFrame
+        return pd.Series(carry_forecast)
         
     except Exception as e:
         print(f"Error calculating carry forecast: {str(e)}")
-        return pd.DataFrame(index=raw_carry.index, columns=["forecast"], data=0)
+        return pd.Series(0, index=raw_carry.index)
 
-def systemtest(data=None, config=None):
+
+def systemtest(data=None, config=None, instrument="SOFR"):
     """
     Example test system combining EWMAC and carry strategies
+    
+    Args:
+        data: Optional data source, defaults to csvFuturesSimData
+        config: Optional system configuration
+        instrument: Instrument code to trade (default: "SOFR")
     """
     if data is None:
         data = csvFuturesSimData()
@@ -98,15 +117,15 @@ def systemtest(data=None, config=None):
         )
         carry_rule = TradingRule(calculate_carry_forecast)
         
-        # Define config
+        # Define config with dynamic instrument
         config = Config(
             dict(
                 trading_rules=dict(ewmac=ewmac_rule, carry=carry_rule),
-                instruments=["SOFR"],
+                instruments=[instrument],
                 forecast_scalars=dict(ewmac=1.0, carry=1.0),
                 forecast_weights=dict(ewmac=0.5, carry=0.5),
                 forecast_div_multiplier=1.1,
-                instrument_weights=dict(SOFR=1.0),
+                instrument_weights={instrument: 1.0},
                 instrument_div_multiplier=1.0,
                 percentage_vol_target=20.0,
                 notional_trading_capital=100000,
@@ -131,15 +150,18 @@ def systemtest(data=None, config=None):
 
     return my_system
 
-def systemtest(data=None):
+def analyze_strategies(data=None, instrument="SOFR"):
     """
-    Example test system combining EWMAC and carry strategies
+    Analyze EWMAC and carry strategies for a given instrument
+    
+    Args:
+        data: Optional data source, defaults to csvFuturesSimData
+        instrument: Instrument code to analyze (default: "SOFR")
     """
     if data is None:
         data = csvFuturesSimData()
 
-    instrument_code = "SOFR"
-    price = data.daily_prices(instrument_code)
+    price = data.daily_prices(instrument)
     
     # Calculate EWMAC forecast
     ewmac = calc_ewmac_forecast(price, 32, 128)
@@ -151,7 +173,7 @@ def systemtest(data=None):
     # Calculate EWMAC P&L
     account = Account()
     ewmac_account = account.pandl_for_instrument_forecast(
-        instrument_code,
+        instrument,
         "ewmac",
         ewmac,
         price
@@ -161,7 +183,7 @@ def systemtest(data=None):
     print(ewmac_account.percent.stats())
     
     # Calculate Carry forecast
-    raw_carry = data.get_instrument_raw_carry_data(instrument_code)
+    raw_carry = data.get_instrument_raw_carry_data(instrument)
     carry_forecast = calculate_carry_forecast(raw_carry)
     
     # Align carry forecast with price data
@@ -170,7 +192,7 @@ def systemtest(data=None):
     
     # Calculate Carry P&L
     carry_account = account.pandl_for_instrument_forecast(
-        instrument_code,
+        instrument,
         "carry",
         carry_forecast,
         price
