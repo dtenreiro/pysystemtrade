@@ -56,7 +56,6 @@ US30,Bond,Gov,,,US,30,Ultra Treasury Bond
 EURIBOR,Bond,STIR,LIBOR,,EU,,Three Month EURIBOR
 LIBOR1,Bond,STIR,LIBOR,,GB,,1 Month LIBOR (Int. Rate)
 STERLING3,Bond,STIR,LIBOR,,GB,,3 month Sterling interest rate
-EDOLLAR,Bond,STIR,LIBOR,,US,,US STIR Eurodollar
 SOFR,Bond,STIR,LIBOR,,US,,Secured Overnight Financing Rate 3-month average of rates
 FED,Bond,STIR,RiskFree,,US,,30 Day Fed Funds
 USIRS2,Bond,Swap,,,US,2,2-Year Deliverable Interest Rate Swap Futures
