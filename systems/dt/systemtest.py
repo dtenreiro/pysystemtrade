@@ -50,7 +50,7 @@ def calculate_carry_forecast(raw_carry):
         print(f"Error calculating carry forecast: {str(e)}")
         return pd.Series(0, index=raw_carry.index)
 
-def systemtest(data=None, config=None, instruments=["SOFR"], start_date=None, end_date=None):
+def systemtest(data=None, config=None, instruments=None, start_date=None, end_date=None):
     """
     Example test system using only carry strategy
     """
@@ -64,30 +64,29 @@ def systemtest(data=None, config=None, instruments=["SOFR"], start_date=None, en
         end_date = pd.to_datetime(end_date)
     
     if config is None:
-        # Create trading rule
-        carry_rule = TradingRule(calculate_carry_forecast)
+        config = Config("systems.dt.systemtestconfig.yaml")
         
-        # Create instrument weights dictionary dynamically
-        instrument_weights = {instrument: 1.0/len(instruments) for instrument in instruments}
-        
-        # Define config with dynamic instruments and date range
-        config = Config(
-            dict(
-                trading_rules=dict(carry=carry_rule),
-                instruments=instruments,
-                forecast_scalars=dict(carry=1.0),
-                forecast_weights=dict(carry=1.0),
-                forecast_div_multiplier=1.1,
-                instrument_weights=instrument_weights,
-                instrument_div_multiplier=1.0,
-                percentage_vol_target=20.0,
-                notional_trading_capital=100000,
-                base_currency="USD",
-                start_date=start_date,
-                end_date=end_date
-            )
-        )
+        # Override config with any provided parameters
+        if instruments is not None:
+            config.instruments = instruments
+            # Update instrument weights to be equal
+            instrument_weights = {instrument: 1.0/len(instruments) for instrument in instruments}
+            config.instrument_weights = instrument_weights
+            
+        if start_date is not None:
+            config.start_date = start_date
+        if end_date is not None:
+            config.end_date = end_date
+    else:
+        # If instruments were provided but we're using an existing config,
+        # make sure the instruments list is updated
+        if instruments is not None:
+            config.instruments = instruments
 
+    # Create trading rule for carry if not in config
+    if "carry" not in config.trading_rules:
+        carry_rule = TradingRule(calculate_carry_forecast)
+        config.trading_rules["carry"] = carry_rule
 
     # Create and wire up system
     my_system = System(

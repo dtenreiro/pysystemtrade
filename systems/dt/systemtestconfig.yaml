@@ -1,0 +1,25 @@
+#YAML
+percentage_vol_target: 20.0
+notional_trading_capital: 100000
+base_currency: "USD"
+instruments:
+  - US2
+  - US5
+  - US10
+  - US20
+  - US30
+trading_rules:
+  carry:
+     function: systems.dt.systemtest.calculate_carry_forecast
+forecast_scalars:
+  carry: 1.0
+forecast_weights:
+  carry: 1.0
+forecast_div_multiplier: 1.1
+instrument_weights:
+  US2: 0.2
+  US5: 0.2
+  US10: 0.2
+  US20: 0.2
+  US30: 0.2
+instrument_div_multiplier: 1.0
