@@ -11,10 +11,28 @@ instruments:
 trading_rules:
   carry:
      function: systems.dt.systemtest.calculate_carry_forecast
+     forecast_scalar: 1.0
+  ewmac8:
+     function: systems.provided.rules.ewmac.ewmac_forecast_with_defaults
+     data: data.daily_prices
+     other_args: 
+         Lfast: 8
+         Lslow: 32
+     forecast_scalar: 5.3
+  ewmac32:
+     function: systems.provided.rules.ewmac.ewmac_forecast_with_defaults
+     other_args: 
+         Lfast: 32
+         Lslow: 128
+     forecast_scalar: 2.65
 forecast_scalars:
   carry: 1.0
+  ewmac8: 5.3
+  ewmac32: 2.65
 forecast_weights:
-  carry: 1.0
+  carry: 0.20
+  ewmac8: 0.35
+  ewmac32: 0.45
 forecast_div_multiplier: 1.1
 instrument_weights:
   US2: 0.2

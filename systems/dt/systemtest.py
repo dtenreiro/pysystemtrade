@@ -11,6 +11,7 @@ from systems.rawdata import RawData
 from systems.trading_rules import TradingRule
 from systems.provided.rules.carry import carry, relative_carry
 from systems.provided.rules.ewmac import robust_vol_calc
+from systems.provided.rules.ewmac import ewmac_forecast_with_defaults as ewmac
 import pandas as pd
 import numpy as np
 
@@ -52,7 +53,7 @@ def calculate_carry_forecast(raw_carry):
 
 def systemtest(data=None, config=None, instruments=None, start_date=None, end_date=None):
     """
-    Example test system using only carry strategy
+    Example test system using carry and EWMAC strategies
     """
     if data is None:
         data = csvFuturesSimData()
@@ -83,10 +84,35 @@ def systemtest(data=None, config=None, instruments=None, start_date=None, end_da
         if instruments is not None:
             config.instruments = instruments
 
-    # Create trading rule for carry if not in config
+    # Create trading rules if not in config
     if "carry" not in config.trading_rules:
         carry_rule = TradingRule(calculate_carry_forecast)
         config.trading_rules["carry"] = carry_rule
+    
+    # Add EWMAC rules if not in config
+    if "ewmac8" not in config.trading_rules:
+        ewmac8_rule = TradingRule((ewmac, [], dict(Lfast=8, Lslow=32)))
+        config.trading_rules["ewmac8"] = ewmac8_rule
+        
+    if "ewmac32" not in config.trading_rules:
+        ewmac32_rule = TradingRule(dict(function=ewmac, other_args=dict(Lfast=32, Lslow=128)))
+        config.trading_rules["ewmac32"] = ewmac32_rule
+    
+    # Set forecast weights if not already set
+    if not hasattr(config, 'forecast_weights') or len(config.forecast_weights) < 2:
+        config.forecast_weights = {
+            "carry": 0.30,
+            "ewmac8": 0.35,
+            "ewmac32": 0.35
+        }
+    
+    # Set forecast scalars if not already set
+    if not hasattr(config, 'forecast_scalars') or len(config.forecast_scalars) < 2:
+        config.forecast_scalars = {
+            "carry": 1.0,
+            "ewmac8": 5.3,
+            "ewmac32": 2.65
+        }
 
     # Create and wire up system
     my_system = System(
@@ -107,7 +133,7 @@ def systemtest(data=None, config=None, instruments=None, start_date=None, end_da
 
 def analyze_strategies(data=None, instruments=["SOFR"], start_date=None, end_date=None):
     """
-    Analyze carry strategy for given instruments
+    Analyze carry and EWMAC strategies for given instruments
     
     Args:
         data: Optional data source, defaults to csvFuturesSimData
@@ -139,11 +165,21 @@ def analyze_strategies(data=None, instruments=["SOFR"], start_date=None, end_dat
         raw_carry = data.get_instrument_raw_carry_data(instrument)
         carry_forecast = calculate_carry_forecast(raw_carry)
         
-        # Filter and align carry forecast with price data
+        # Calculate EWMAC forecasts
+        ewmac8_forecast = ewmac(price, Lfast=8, Lslow=32)
+        ewmac32_forecast = ewmac(price, Lfast=32, Lslow=128)
+        
+        # Filter and align forecasts with price data
         carry_forecast = carry_forecast.reindex(price.index, method='ffill')
         carry_forecast = carry_forecast.fillna(0)
         
-        # Calculate Carry P&L
+        ewmac8_forecast = ewmac8_forecast.reindex(price.index, method='ffill')
+        ewmac8_forecast = ewmac8_forecast.fillna(0)
+        
+        ewmac32_forecast = ewmac32_forecast.reindex(price.index, method='ffill')
+        ewmac32_forecast = ewmac32_forecast.fillna(0)
+        
+        # Calculate P&L for each strategy
         account = Account()
         carry_account = account.pandl_for_instrument_forecast(
             instrument,
@@ -152,8 +188,33 @@ def analyze_strategies(data=None, instruments=["SOFR"], start_date=None, end_dat
             price
         )
         
+        ewmac8_account = account.pandl_for_instrument_forecast(
+            instrument,
+            "ewmac8",
+            ewmac8_forecast,
+            price
+        )
+        
+        ewmac32_account = account.pandl_for_instrument_forecast(
+            instrument,
+            "ewmac32",
+            ewmac32_forecast,
+            price
+        )
+        
         print(f"\n{instrument} Carry Strategy Stats:")
         print(carry_account.percent.stats())
-        results[instrument] = carry_account
+        
+        print(f"\n{instrument} EWMAC8 Strategy Stats:")
+        print(ewmac8_account.percent.stats())
+        
+        print(f"\n{instrument} EWMAC32 Strategy Stats:")
+        print(ewmac32_account.percent.stats())
+        
+        results[instrument] = {
+            "carry": carry_account,
+            "ewmac8": ewmac8_account,
+            "ewmac32": ewmac32_account
+        }
 
     return results
