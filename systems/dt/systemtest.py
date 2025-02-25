@@ -51,9 +51,19 @@ def calculate_carry_forecast(raw_carry):
         print(f"Error calculating carry forecast: {str(e)}")
         return pd.Series(0, index=raw_carry.index)
 
-def systemtest(data=None, config=None, instruments=None, start_date=None, end_date=None):
+def systemtest(data=None, config=None, instruments=None, start_date=None, end_date=None, 
+               forecast_weights=None):
     """
     Example test system using carry and EWMAC strategies
+    
+    Args:
+        data: Optional data source, defaults to csvFuturesSimData
+        config: Optional config object
+        instruments: Optional list of instruments to override config
+        start_date: Optional start date for analysis (str or datetime)
+        end_date: Optional end date for analysis (str or datetime)
+        forecast_weights: Optional dictionary of forecast weights to override config
+                         e.g. {"carry": 0.5, "ewmac8": 0.25, "ewmac32": 0.25}
     """
     if data is None:
         data = csvFuturesSimData()
@@ -98,8 +108,13 @@ def systemtest(data=None, config=None, instruments=None, start_date=None, end_da
         ewmac32_rule = TradingRule(dict(function=ewmac, other_args=dict(Lfast=32, Lslow=128)))
         config.trading_rules["ewmac32"] = ewmac32_rule
     
-    # Set forecast weights if not already set
-    if not hasattr(config, 'forecast_weights') or len(config.forecast_weights) < 2:
+    # Set forecast weights if provided as parameter (overrides config)
+    if forecast_weights is not None:
+        config.forecast_weights = forecast_weights
+        # Make sure we're not using estimated weights
+        config.use_forecast_weight_estimates = False
+    # Set default forecast weights if not already set
+    elif not hasattr(config, 'forecast_weights') or len(config.forecast_weights) < 2:
         config.forecast_weights = {
             "carry": 0.30,
             "ewmac8": 0.35,
