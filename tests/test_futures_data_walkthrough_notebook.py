@@ -44,9 +44,9 @@ def test_notebook_has_beginner_friendly_structure() -> None:
 def test_notebook_references_repo_files_and_interfaces() -> None:
     notebook = load_notebook()
     code_cells = cell_sources(notebook, "code")
-    all_text = "\n".join(cell_sources(notebook, "markdown")) + "\n" + "\n".join(
-        code_cells
-    )
+    markdown = "\n".join(cell_sources(notebook, "markdown"))
+    core_code = "\n".join(code_cells[:-2])
+    all_text = markdown + "\n" + "\n".join(code_cells)
 
     assert "data/futures/csvconfig/instrumentconfig.csv" in all_text
     assert "data/futures/csvconfig/rollconfig.csv" in all_text
@@ -62,9 +62,9 @@ def test_notebook_references_repo_files_and_interfaces() -> None:
     assert "csvFuturesSimData" in all_text
     assert "dbFuturesSimData" in all_text
     assert "dataBlob" in all_text
-    assert "from sysdata.data_blob import dataBlob" not in all_text
-    assert "from sysdata.sim.csv_futures_sim_data import csvFuturesSimData" not in all_text
-    assert "from sysdata.sim.db_futures_sim_data import dbFuturesSimData" not in all_text
+    assert "from sysdata.data_blob import dataBlob" not in core_code
+    assert "from sysdata.sim.csv_futures_sim_data import csvFuturesSimData" not in core_code
+    assert "from sysdata.sim.db_futures_sim_data import dbFuturesSimData" not in core_code
 
     execute_code_cells(code_cells)
 
@@ -79,3 +79,23 @@ def test_notebook_references_repo_files_and_interfaces() -> None:
     assert "rollconfig.csv" in runnable_code
     assert "spreadcosts.csv" in runnable_code
     assert "DATA_ROOT / \"csvconfig\"" in runnable_code
+
+
+def test_notebook_includes_guarded_optional_integration_examples() -> None:
+    notebook = load_notebook()
+    markdown = "\n".join(cell_sources(notebook, "markdown"))
+    code_cells = cell_sources(notebook, "code")
+    runnable_code = "\n".join(code_cells)
+
+    assert "## Optional integration examples" in markdown
+    assert "### MongoDB" in markdown
+    assert "### Interactive Brokers" in markdown
+    assert "## Where to go next" in markdown
+
+    assert "RUN_MONGODB_EXAMPLE = False" in runnable_code
+    assert "RUN_INTERACTIVE_BROKERS_EXAMPLE = False" in runnable_code
+    assert "if RUN_MONGODB_EXAMPLE:" in runnable_code
+    assert "if RUN_INTERACTIVE_BROKERS_EXAMPLE:" in runnable_code
+    assert "from sysdata.data_blob import dataBlob" in runnable_code
+    assert "from sysdata.sim.db_futures_sim_data import dbFuturesSimData" in runnable_code
+    assert "from sysinit.futures.seed_price_data_from_IB import seed_price_data_from_IB" in runnable_code
