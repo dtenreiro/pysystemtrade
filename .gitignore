@@ -25,6 +25,13 @@ restats
 # venv
 env/
 venv/
+.venv/
 
 # libreoffice
 .~lock.*
+
+# agents/llm
+CLAUDE.md
+AGENTS.md
+.cursor/
+
