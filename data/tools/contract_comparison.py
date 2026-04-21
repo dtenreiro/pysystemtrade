@@ -91,7 +91,7 @@ class ContractComparison:
         instrument_code: str,
         price_date_str: str,
         forward_date_str: str,
-        resample_period: str = "D",
+        resample_period: str | None = "D",
     ):
         """
         :param instrument_code: symbol for instrument.
@@ -139,7 +139,7 @@ class ContractComparison:
         instrument_code: str,
         price_date_str: str,
         forward_date_str: str,
-        resample_period: str = "D",
+        resample_period: str | None = "D",
     ):
         """
         :param instrument_code: symbol for instrument.
@@ -188,7 +188,7 @@ class ContractComparison:
         instrument_code: str,
         price_date_str: str,
         forward_date_str: str,
-        resample_period: str = "D",
+        resample_period: str | None = "D",
     ):
         """
         :param instrument_code: symbol for instrument.
