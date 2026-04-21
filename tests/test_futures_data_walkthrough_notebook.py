@@ -13,7 +13,7 @@ def load_notebook() -> dict:
 
 def cell_sources(notebook: dict, cell_type: str) -> list[str]:
     return [
-        "".join(cell.get("source", []))
+        "".join(source) if isinstance(source := cell.get("source", []), list) else source
         for cell in notebook["cells"]
         if cell.get("cell_type") == cell_type
     ]

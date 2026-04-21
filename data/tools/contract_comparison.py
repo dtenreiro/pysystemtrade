@@ -13,10 +13,13 @@ class ContractComparison:
     @staticmethod
     def _resample_if_datetime_index(
         comparison_df: pd.DataFrame,
-        resample_period: str,
+        resample_period: str | None,
         method: str,
         context: str = "",
     ) -> pd.DataFrame:
+        if method not in {"last", "sum"}:
+            raise ValueError("method must be one of {'last', 'sum'}")
+
         if resample_period is None:
             return comparison_df
 
@@ -91,7 +94,7 @@ class ContractComparison:
         instrument_code: str,
         price_date_str: str,
         forward_date_str: str,
-        resample_period: str = "D",
+        resample_period: str | None = "D",
     ):
         """
         :param instrument_code: symbol for instrument.
@@ -139,7 +142,7 @@ class ContractComparison:
         instrument_code: str,
         price_date_str: str,
         forward_date_str: str,
-        resample_period: str = "D",
+        resample_period: str | None = "D",
     ):
         """
         :param instrument_code: symbol for instrument.
@@ -188,7 +191,7 @@ class ContractComparison:
         instrument_code: str,
         price_date_str: str,
         forward_date_str: str,
-        resample_period: str = "D",
+        resample_period: str | None = "D",
     ):
         """
         :param instrument_code: symbol for instrument.
