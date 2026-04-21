@@ -19,6 +19,12 @@ def cell_sources(notebook: dict, cell_type: str) -> list[str]:
     ]
 
 
+def execute_code_cells(code_cells: list[str]) -> None:
+    namespace: dict[str, object] = {}
+    for index, code in enumerate(code_cells):
+        exec(compile(code, f"<futures-data-walkthrough-cell-{index}>", "exec"), namespace)
+
+
 def test_notebook_has_beginner_friendly_structure() -> None:
     notebook = load_notebook()
     markdown_cells = cell_sources(notebook, "markdown")
@@ -56,6 +62,11 @@ def test_notebook_references_repo_files_and_interfaces() -> None:
     assert "csvFuturesSimData" in all_text
     assert "dbFuturesSimData" in all_text
     assert "dataBlob" in all_text
+    assert "from sysdata.data_blob import dataBlob" not in all_text
+    assert "from sysdata.sim.csv_futures_sim_data import csvFuturesSimData" not in all_text
+    assert "from sysdata.sim.db_futures_sim_data import dbFuturesSimData" not in all_text
+
+    execute_code_cells(code_cells)
 
     first_code = code_cells[0]
     assert "def find_repo_root" in first_code
