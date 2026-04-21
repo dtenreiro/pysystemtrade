@@ -13,13 +13,10 @@ class ContractComparison:
     @staticmethod
     def _resample_if_datetime_index(
         comparison_df: pd.DataFrame,
-        resample_period: str | None,
+        resample_period: str,
         method: str,
         context: str = "",
     ) -> pd.DataFrame:
-        if method not in {"last", "sum"}:
-            raise ValueError("method must be one of {'last', 'sum'}")
-
         if resample_period is None:
             return comparison_df
 
