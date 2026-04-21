@@ -2,12 +2,52 @@ from sysproduction.data.prices import diagPrices
 
 from sysobjects.contracts import futuresContract
 import pandas as pd
+import warnings
 
 diag_prices = diagPrices()
 
 
 class ContractComparison:
     """Class for comparing futures contracts side by side on different dimensions"""
+
+    @staticmethod
+    def _resample_if_datetime_index(
+        comparison_df: pd.DataFrame,
+        resample_period: str,
+        method: str,
+        context: str = "",
+    ) -> pd.DataFrame:
+        if resample_period is None:
+            return comparison_df
+
+        if isinstance(comparison_df.index, pd.DatetimeIndex):
+            return (
+                comparison_df.resample(resample_period).last()
+                if method == "last"
+                else comparison_df.resample(resample_period).sum()
+            )
+
+        # Some data sources can return an empty/default RangeIndex.
+        # Try coercing index to datetimes, and if that fails, return as-is.
+        converted_index = pd.to_datetime(comparison_df.index, errors="coerce")
+        if converted_index.notna().any():
+            df_with_dt_index = comparison_df.copy()
+            df_with_dt_index.index = converted_index
+            df_with_dt_index = df_with_dt_index[~df_with_dt_index.index.isna()]
+            return (
+                df_with_dt_index.resample(resample_period).last()
+                if method == "last"
+                else df_with_dt_index.resample(resample_period).sum()
+            )
+
+        warning_context = f" for {context}" if context else ""
+        warnings.warn(
+            "Resampling skipped%s because dataframe index is %s and could not be coerced to datetime. "
+            "Results may be empty or unaggregated."
+            % (warning_context, type(comparison_df.index).__name__),
+            stacklevel=2,
+        )
+        return comparison_df
 
     def _create_comparison(
         self, instrument_code: str, price_date_str: str, forward_date_str: str
@@ -84,11 +124,15 @@ class ContractComparison:
             ]
         )
 
-        if resample_period is not None:
-            return comparison_df.resample(resample_period).sum()
-
-        else:
-            return comparison_df
+        return self._resample_if_datetime_index(
+            comparison_df=comparison_df,
+            resample_period=resample_period,
+            method="sum",
+            context=(
+                "volume comparison (%s %s vs %s)"
+                % (instrument_code, price_date_str, forward_date_str)
+            ),
+        )
 
     def get_price_comparison(
         self,
@@ -129,11 +173,15 @@ class ContractComparison:
             ]
         )
 
-        if resample_period is not None:
-            return comparison_df.resample(resample_period).last()
-
-        else:
-            return comparison_df
+        return self._resample_if_datetime_index(
+            comparison_df=comparison_df,
+            resample_period=resample_period,
+            method="last",
+            context=(
+                "price comparison (%s %s vs %s)"
+                % (instrument_code, price_date_str, forward_date_str)
+            ),
+        )
 
     def get_price_volume_comparison(
         self,
